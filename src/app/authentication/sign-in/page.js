@@ -15,6 +15,10 @@ import {
   InputAdornment,
   IconButton,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import Image from 'next/image';
@@ -24,6 +28,9 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [openForgotDialog, setOpenForgotDialog] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMessage, setForgotMessage] = useState('');
   const router = useRouter();
   const { login } = useAuth();
 
@@ -47,7 +54,6 @@ export default function SignIn() {
     try {
       const result = await login(formData.username, formData.password);
       if (result.success) {
-        // Arahkan ke dashboard berdasarkan role
         const { role } = result.data.user;
         switch (role) {
           case 'superadmin':
@@ -68,6 +74,41 @@ export default function SignIn() {
     } catch (error) {
       console.error('Login error:', error);
       setError('Terjadi kesalahan saat login. Silakan coba lagi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPasswordOpen = () => setOpenForgotDialog(true);
+  const handleForgotPasswordClose = () => {
+    setOpenForgotDialog(false);
+    setForgotEmail('');
+    setForgotMessage('');
+  };
+
+  const handleForgotPasswordSubmit = async () => {
+    if (!forgotEmail) {
+      setForgotMessage('Masukkan email Anda.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+
+      if (res.ok) {
+        setForgotMessage('Link reset password telah dikirim ke email Anda.');
+      } else {
+        const errorData = await res.json();
+        setForgotMessage(errorData.message || 'Gagal mengirim permintaan reset password.');
+      }
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      setForgotMessage('Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -133,8 +174,19 @@ export default function SignIn() {
                   </InputAdornment>
                 ),
               }}
-              sx={{ mb: 3 }}
+              sx={{ mb: 2 }}
             />
+            <Box sx={{ textAlign: 'right', mb: 2 }}>
+              <Button
+                variant="text"
+                size="small"
+                onClick={handleForgotPasswordOpen}
+                disabled={loading}
+                sx={{ textTransform: 'none', color: '#1a237e' }}
+              >
+                Lupa Password?
+              </Button>
+            </Box>
             <Button
               type="submit"
               fullWidth
@@ -154,6 +206,39 @@ export default function SignIn() {
           </Box>
         </Paper>
       </Box>
+
+      {/* Dialog untuk Lupa Password */}
+      <Dialog open={openForgotDialog} onClose={handleForgotPasswordClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Lupa Password</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Masukkan email Anda untuk menerima link reset password.
+          </Typography>
+          <TextField
+            label="Email"
+            type="email"
+            value={forgotEmail}
+            onChange={(e) => setForgotEmail(e.target.value)}
+            fullWidth
+            required
+            disabled={loading}
+            helperText="Masukkan email yang terkait dengan akun Anda"
+          />
+          {forgotMessage && (
+            <Alert severity={forgotMessage.includes('berhasil') ? 'success' : 'error'} sx={{ mt: 2 }}>
+              {forgotMessage}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleForgotPasswordClose} disabled={loading}>
+            Batal
+          </Button>
+          <Button onClick={handleForgotPasswordSubmit} variant="contained" disabled={loading}>
+            {loading ? <CircularProgress size={24} /> : 'Kirim'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
